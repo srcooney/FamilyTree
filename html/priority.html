@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="description" content="Web Components - Template: Sample" />
+  <meta charset="utf-8">
+  <title>Web Components - Template: Sample</title>
+  <template id="template">
+    <style>
+      @keyframes roll {
+        0% {transform: rotateY(0deg)}
+        100% {transform: rotateY(360deg)}
+      }
+      .webcomponents {
+        transform-style: preserve-3d;
+        animation: roll 2s infinite linear;
+      }
+      #container {
+        perspective: 800px;
+      }
+    </style>
+    <div id="container">
+      <img class="webcomponents" src="http://webcomponents.org/img/logo.svg">
+    </div>
+  </template>
+</head>
+<body>
+  <div id="host"></div>
+</body>
+</html>
