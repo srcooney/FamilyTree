@@ -1,29 +1,90 @@
+SVG = {
+  createCanvas : function( width, height ){
+    var canvas = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    canvas.setAttribute('width', width);
+    canvas.setAttribute('height', height);  
+    return canvas;
+  },
+  createLine : function (x1, y1, x2, y2, color, w) {
+    var aLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    aLine.setAttribute('x1', x1);
+    aLine.setAttribute('y1', y1);
+    aLine.setAttribute('x2', x2);
+    aLine.setAttribute('y2', y2);
+    aLine.setAttribute('stroke', color);
+    aLine.setAttribute('stroke-width', w);
+    return aLine;
+  }
+}
+
 $(document).ready(function(){
-	
 	$.ajax({url: "/GetUserFamilyTree", success: function(result){
+		console.log(result);
+		if(result == ""){
+			$(document.body).load("html/home_page.html");
+			return;
+		}
 		treeJson = JSON.parse(result);
 		if(treeJson.length == 0){
 			$(document.body).load("html/home_page.html");
 			return;
 		};
-		console.log(result)
-		
-		console.log(treeJson)
 		for (i=0;i < treeJson.length;i+=1) {
-			var member_holder = document.createElement( "div" );
-			$(member_holder).addClass("member_holder")
-			$(member_holder).data("level",0);
-			var member = document.createElement( "div" );
-			$(member_holder).append(member);
-			$(member).addClass("member label label-info");
-			$(member).text(treeJson[i].name);
-			$(member).css("margin","0 auto");
-			$(member).data("familyID",treeJson[i].familyID);
-			$(member).data("memberID",treeJson[i].memberID);
-			$(document.body).append(member_holder);
+			add_member_to_webpage(treeJson[i],true);
+		};
+		var old_level =-1;
+		for (i=0;i < treeJson.length;i+=1) {
+			if(treeJson[i].treeLevel != old_level){
+				old_level =treeJson[i].treeLevel;
+				var svg = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
+				$(svg).attr("width","100%").attr("height","90");
+		    };
+			if(treeJson[i].children.length != 0){
+				for (j=0;j < treeJson[i].children.length;j+=1) {
+					(function(n,m) {
+						var line = document.createElementNS("http://www.w3.org/2000/svg", 'line');
+						$(line).addClass("line")
+						$(line).attr('stroke','#FF0000').attr('stroke-width','2')
+						div = $( ".member:contains('"+treeJson[n].name+"')" );
+						div1 = $( ".member:contains('"+treeJson[n].children[m]+"')" );
+						var pos1 = div.position();
+						var pos2 = div1.position();
+						$(line).attr('x1',pos1.left+div1.width()/2).attr('y1',0).attr('x2',pos2.left+div1.width()/2).attr('y2',90);
+						$(svg).append(line);
+					 })(i,j);
+				};
+				div = $( ".member:contains('"+treeJson[i].name+"')" );
+				div.parent().after(svg);
+			};
 		};
 	}});
 });
+$.fn.filterByData = function(prop, val) {
+    return this.filter(
+        function() { return $(this).data(prop)==val; }
+    );
+}
+var add_member_to_webpage = function(memberData,appendMemberHolder){
+	var member_holder;
+	member_holder = $(".member_holder").filterByData('treeLevel', memberData.treeLevel);
+	if(member_holder.length == 0){
+		member_holder = document.createElement( "div" );
+		$(member_holder).addClass("member_holder")
+		$(member_holder).data("treeLevel",memberData.treeLevel);
+		if(appendMemberHolder == true) {
+			$(document.body).append(member_holder);
+		} else {
+			$(document.body).prepend(member_holder);
+		}
+	}
+	
+	var member = document.createElement( "div" );
+	$(member_holder).append(member);
+	$(member).addClass("member label label-info");
+	$(member).text(memberData.name);
+	$(member).data("familyID",memberData.familyID);
+	$(member).data("memberID",memberData.memberID);
+};
 
 $(document).on("click","#add_family_tree",function(){
 	$(document.body).empty();
@@ -35,14 +96,7 @@ $(document).on("click","#submit_family",function(){
 		success: function(result){
 			$(document.body).empty();
 			memberJson = JSON.parse(result);
-			var member = document.createElement( "div" );
-			$(member).addClass("member label label-info");
-			$(member).text(memberJson.member.name);
-			$(member).width(100);
-			$(member).css("margin","auto");
-			$(member).data("familyID",memberJson.member.familyID);
-			$(member).data("memberID",memberJson.member.memberID);
-			$(document.body).append(member);
+			add_member_to_webpage(memberJson.member,true);
 		}});
 });
 
@@ -69,7 +123,8 @@ $(document).on("click",".member",function(){
 		console.log(that)
 		$.ajax({url: "/GetUserFamilyMember",data: {familyID: $(that).data('familyID'), memberID:$(that).data('memberID')}, 
 			success: function(result){
-				display_all_info(result);	
+				var memberJson = JSON.parse(result);
+				display_all_info(memberJson);	
 			}});
 		});
 });
@@ -80,12 +135,34 @@ var add_info = function(place_holder,id){
 	$(".member-content").append(info_input)	
 };
 
+var add_picture_info = function(place_holder,id){
+//	var info_input = '<div class="input-group"><input type="file" class="form-control" placeholder="'+place_holder+'" aria-describedby="basic-addon2">'+
+//	  '<span class="input-group-addon glyphicon glyphicon-cloud-upload" id="'+id+'"></span></div>';
+//	$(".member-content").append(info_input)	
+//	familyID: $('.member-content').data('familyID'), memberID:$('.member-content').data('memberID')
+	
+	var info_input = '<form action="/SaveAvatar" enctype="multipart/form-data" method="post">'+
+	'<div><input name="familyID">'+$('.member-content').data('familyID')+'</input><input name="memberID">'+$('.member-content').data('memberID')+'</input>'+
+    '<input type="file" name="file"/></div><div><input type="submit" value="Upload"></div></form>';
+    
+	
+	$(".member-content").append(info_input)	
+};
+
 var save_info = function(that,url){
 	var input = $(that).prev();
 	$.ajax({url: url,data: {familyID: $('.member-content').data('familyID'), memberID:$('.member-content').data('memberID'),info:$(input).val()}, 
 		success: function(result){
 			$(".member-content").empty();
-			display_all_info(result);
+			var memberJson = JSON.parse(result);
+			display_all_info(memberJson);
+			if(memberJson.member2 != undefined) {
+				if(url == "/SaveParent") {
+					add_member_to_webpage(memberJson.member2,false);
+				} else{
+					add_member_to_webpage(memberJson.member2,true);
+				}
+			};
 		}});
 };
 
@@ -117,15 +194,13 @@ var display_single_info_type = function(title,info_type,separated = false,is_lin
 };
 
 
-var display_all_info = function(member_json){
-	memberJson = JSON.parse(member_json);
+var display_all_info = function(memberJson){	
 	$(".member-content").data("familyID",memberJson.member1.familyID);
 	$(".member-content").data("memberID",memberJson.member1.memberID);
 	
 	var name = document.createElement( "h1" );
 	$(name).text(memberJson.member1.name);
 	$(".member-content").append(name);
-	console.log(memberJson.member1);
 	
 	display_single_info_type("Birthday",memberJson.member1.birthday);
 	display_single_info_type("Spouse",memberJson.member1.spouse);
@@ -133,17 +208,11 @@ var display_all_info = function(member_json){
 	display_single_info_type("Children",memberJson.member1.children,false);
 	display_single_info_type("Links",memberJson.member1.links,true,true);
 	display_single_info_type("Stories",memberJson.member1.stories,true);
-	console.log(memberJson.member2);
-	if(memberJson.member2 != undefined) {
-		var member = document.createElement( "div" );
-		$(".member_holder").append(member);
-		$(member).addClass("member label label-info");
-		$(member).text(memberJson.member2.name);
-		$(member).css("margin","0 auto");
-		$(member).data("familyID",memberJson.member2.familyID);
-		$(member).data("memberID",memberJson.member2.memberID);
-	};
+
 };
+
+$(document).on("click","#add_picture",function(){add_picture_info("Please Find Your Picture","submit_picture");});
+$(document).on("click","#submit_picture",function(){save_info(this,"/SaveAvatar");});
 
 $(document).on("click","#add_bday",function(){add_info("Please Enter Your Birthday","submit_bday");});
 $(document).on("click","#submit_bday",function(){save_info(this,"/SaveBirthday");});

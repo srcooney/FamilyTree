@@ -14,3 +14,28 @@ indexes:
   properties:
   - name: familyID
   - name: memberID
+
+- kind: FamilyMember
+  properties:
+  - name: familyID
+  - name: treeLevel
+
+- kind: FamilyMember
+  properties:
+  - name: familyID
+  - name: treeLevel
+  - name: parentID
+
+- kind: FamilyMember
+  properties:
+  - name: familyID
+  - name: treeLevel
+  - name: parentID
+  - name: memberID
+
+- kind: FamilyMember
+  properties:
+  - name: familyID
+  - name: treeLevel
+  - name: parentID
+    direction: desc

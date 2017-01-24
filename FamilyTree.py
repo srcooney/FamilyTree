@@ -25,15 +25,18 @@ class LoginPage(webapp2.RequestHandler):
 
 class FamilyMember(ndb.Model):
     name = ndb.StringProperty()
+    avatar = ndb.BlobProperty()
     familyName = ndb.StringProperty()
     familyID = ndb.IntegerProperty()
     memberID = ndb.IntegerProperty()
     birthday = ndb.StringProperty()
     spouse = ndb.StringProperty()
     parents = ndb.StringProperty(repeated=True)
+    parentID = ndb.IntegerProperty()
     children = ndb.StringProperty(repeated=True)
     links = ndb.StringProperty(repeated=True)
     stories = ndb.StringProperty(repeated=True)
+    treeLevel = ndb.IntegerProperty()
     
 class User(ndb.Model):
     userName = ndb.StringProperty()
@@ -73,13 +76,21 @@ def sendtwoMembers(self,familyMember1,familyMember2):
     self.response.headers.add_header('content-type', 'application/json', charset='utf-8')
     self.response.out.write(jsonObj)
     
-def createNewMember(self,name):
+def createNewMember(self,name,treeLevel):
     familyID = self.request.get('familyID')
     familyMemberList = FamilyMember.query(FamilyMember.familyID == int(familyID)).fetch()
-    newMember = FamilyMember(name=name,familyName=familyMemberList[0].familyName,familyID=int(familyID),memberID=len(familyMemberList)) 
+    newMember = FamilyMember(name=name,familyName=familyMemberList[0].familyName,familyID=int(familyID),memberID=len(familyMemberList),treeLevel=treeLevel) 
     newMember.put()
     return newMember
 
+class SaveAvatar(webapp2.RequestHandler):         
+    def post(self):
+        avatar = self.request.get('file')
+        logging.info("familityID="+self.request.get('familyID'))
+        familyMember = getMember(self)
+        familyMember.avatar = avatar
+        familyMember.put()
+        sendMember(self,familyMember)
    
 class SaveBirthday(webapp2.RequestHandler):         
     def get(self):
@@ -95,7 +106,9 @@ class SaveSpouse(webapp2.RequestHandler):
         familyMember = getMember(self)
         familyMember.spouse = spouse
         familyMember.put()
-        secondMember = createNewMember(self,spouse)
+        secondMember = createNewMember(self,spouse,familyMember.treeLevel)
+        secondMember.spouse = familyMember.name
+        secondMember.put()
         sendtwoMembers(self,familyMember,secondMember)  
               
 class SaveParent(webapp2.RequestHandler):         
@@ -104,7 +117,10 @@ class SaveParent(webapp2.RequestHandler):
         familyMember = getMember(self)
         familyMember.parents.append(parent)
         familyMember.put()
-        secondMember = createNewMember(self,parent)
+        secondMember = createNewMember(self,parent,familyMember.treeLevel-1)
+        familyMember.parentID = secondMember.memberID
+        secondMember.children.append(familyMember.name)
+        secondMember.put()
         sendtwoMembers(self,familyMember,secondMember)
 
 class SaveChild(webapp2.RequestHandler):         
@@ -113,7 +129,10 @@ class SaveChild(webapp2.RequestHandler):
         familyMember = getMember(self)
         familyMember.children.append(child)
         familyMember.put()
-        secondMember = createNewMember(self,child)
+        secondMember = createNewMember(self,child,familyMember.treeLevel+1)
+        secondMember.parentID = familyMember.memberID
+        secondMember.parents.append(familyMember.name)
+        secondMember.put()
         sendtwoMembers(self,familyMember,secondMember)
 
 class SaveLink(webapp2.RequestHandler):         
@@ -141,8 +160,9 @@ class GetUserFamilyTree(webapp2.RequestHandler):
         
         if myUser.familyID == None:
             return
-        familyTree = FamilyMember.query(FamilyMember.familyID == myUser.familyID).fetch()
+        familyTree = FamilyMember.query(FamilyMember.familyID == myUser.familyID).order(FamilyMember.treeLevel,FamilyMember.parentID,FamilyMember.memberID).fetch()
         jsonObj = json.dumps([k.to_dict() for k in familyTree])
+        logging.info(jsonObj)
         self.response.headers.add_header('content-type', 'application/json', charset='utf-8')
         self.response.out.write(jsonObj)
            
@@ -156,7 +176,7 @@ class SaveFirstMember(webapp2.RequestHandler):
         if len(memberMaxFamilyID) != 0:
             familyID = memberMaxFamilyID[0].familyID + 1
         
-        newMember = FamilyMember(name=memberName,familyName=familyName,familyID=familyID,memberID=0) 
+        newMember = FamilyMember(name=memberName,familyName=familyName,familyID=familyID,memberID=0,treeLevel=0) 
         newMember.put()
         
         myUser = User.getUser()
@@ -192,6 +212,7 @@ application = webapp2.WSGIApplication([
     ('/SaveFirstMember', SaveFirstMember),
     ('/GetUserFamilyTree', GetUserFamilyTree),
     ('/GetUserFamilyMember', GetUserFamilyMember),
+    ('/SaveAvatar', SaveAvatar),
     ('/SaveBirthday', SaveBirthday),
     ('/SaveSpouse', SaveSpouse),
     ('/SaveParent', SaveParent),

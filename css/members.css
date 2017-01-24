@@ -3,7 +3,21 @@
 }
 
 .member {
-    display: table;
-    margin: 0 auto;
+
+    text-align:center;
+    height: 30px;
+    width:200px;
 }
 
+.member_holder {
+   display: -webkit-flex;
+   display: flex;
+   width: 100%;
+}
+
+.line{
+  position:absolute;
+  width:2px;
+  margin-top:-1px;
+  background-color:red;
+}  
